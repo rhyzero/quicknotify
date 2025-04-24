@@ -15,17 +15,26 @@ export let options = {
   },
 };
 
+let counter = 0;
+function nextEmail() {
+  counter += 1;
+  return `user${counter}@example.com`;
+}
+
 export default () => {
-  const url = "http://producer-api:8080/api/notify";
+  const url = "http://producer:8080/api/notify";
+
   const payload = JSON.stringify({
     type: "EMAIL",
-    recipient: "load@test.com",
-    body: "bench-mark",
+    recipient: nextEmail(),
+    body: "Benchmark message " + counter,
   });
 
-  const params = { headers: { "Content-Type": "application/json" } };
-  const res = http.post(url, payload, params);
+  const res = http.post(url, payload, {
+    headers: { "Content-Type": "application/json" },
+    timeout: "2s",
+  });
 
   check(res, { 202: (r) => r.status === 202 });
-  sleep(0.01); // tiny pause so k6 doesn’t loop
+  sleep(0.01); // tiny pause so k6 doesn't loop
 };
