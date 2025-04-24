@@ -1,0 +1,55 @@
+version: "3.9"
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    environment:
+      RABBITMQ_ULIMIT_NOFILE: 65536
+    ports: ["5672:5672", "15672:15672"]
+
+  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_DATABASE: quicknotify
+      MYSQL_PASSWORD: 1234
+      MYSQL_ROOT_PASSWORD: 1234
+    ports: ["3306:3306"]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      retries: 5
+
+  producer-api:
+    container_name: producer
+    build:
+      context: .
+      dockerfile: producer/Dockerfile
+    depends_on:
+      - rabbitmq
+    environment:
+      SPRING_RABBITMQ_HOST: rabbitmq
+      APP_MESSAGING_EXCHANGE: quicknotify.exchange
+    ports: ["8080:8080"]
+
+  consumer-worker:
+    build:
+      context: .
+      dockerfile: consumer/Dockerfile
+    depends_on:
+      - rabbitmq
+      - mysql
+    environment:
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/quicknotify
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: 1234
+    ports: ["8081:8081"]
+
+  k6:
+    image: grafana/k6
+    volumes:
+      - ./loadtest:/scripts:ro
+    entrypoint: ["k6", "run", "/scripts/notify.js"]
+    depends_on:
+      - producer-api
+    networks:
+      - default
